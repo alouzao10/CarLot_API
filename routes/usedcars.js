@@ -1,9 +1,12 @@
 const express = require("express");
 const router = express.Router();
 
+const fetch = require("node-fetch");
+
 const usedCars = require("../data/UsedCars.js");
 
-const fetch = require("node-fetch");
+const API_URL = "https://vpic.nhtsa.dot.gov/api//vehicles/GetModelsForMake";
+const API_FORMAT = "format=json";
 
 router.get("/", (req, res) => {
    res.status(200).json(usedCars);
@@ -28,10 +31,8 @@ router.get("/value/:id", async (req, res) => {
       });
    } else {
       const { make, model, age, mileage, owners, collisions, value } = car[0];
-      console.log(make, model, ", Initial value = ", value);
-      let foundMake = await fetch(
-         `https://vpic.nhtsa.dot.gov/api//vehicles/GetModelsForMake/${make}?format=json`
-      )
+      console.log(`${make} ${model}, Initial Value = $${value.toFixed(2)}`);
+      let foundMake = await fetch(`${API_URL}/${make}?${API_FORMAT}`)
          .then((ret) => ret.json())
          .then((data) => {
             return data;
@@ -61,74 +62,68 @@ router.get("/value/:id", async (req, res) => {
                finalValue = value - value * 0.25;
                console.log("After 2+ Owners = ", finalValue);
             } else {
+               // Set to the initial value
                finalValue = value;
             }
-            // Check the collisions
+
+            // Check the Collisions
             // For every collision remove 2% of its value up to 5 collisions
             // If 0, doesn't effect final value
             if (collisions > 0) {
-               let collPercent;
-               if (collisions <= 5) {
-                  collPercent = 0.02 * collisions;
-               } else {
-                  collPercent = 0.1; // 0.02 * 5
-               }
-               finalValue = finalValue - finalValue * collPercent;
-
-               /*for (let i = 1; i <= collisions; i++) {
+               for (let i = 1; i <= collisions; i++) {
                   if (i <= 5) {
                      finalValue = finalValue - finalValue * 0.02;
                   } else {
                      break;
                   }
-               }*/
+               }
             }
             console.log("After Collisions = ", finalValue);
 
-            // Check the mileage
+            // Check the Mileage
             // Reduce the value by .002% for every 1,000 miles
             // After the mileage reaches 150,000 miles its value can't be reduced
             // If 0, doesn't effect final value
             if (mileage > 0) {
-               let totMiles = Math.ceil(mileage / 1000) * 1000;
-               let milePercent;
-               if (totMiles === 1000) {
-                  milePercent = 0.002;
-               } else if (totMiles <= 150000) {
-                  milePercent = 0.002 * (totMiles / 1000);
-               } else {
-                  milePercent = 0.3; // 0.002 * (150000 / 1000)
-               }
-               finalValue = finalValue - finalValue * milePercent;
-
-               /*if (totMiles === 1000) {
-                  finalValue = finalValue - finalValue * 0.002;
-               } else {
-                  for (let i = 1000; i < totMiles; i += 1000) {
-                     if (i <= 150000) {
-                        finalValue = finalValue - finalValue * 0.002;
-                     } else {
-                        break;
-                     }
+               let totMiles = Math.floor(mileage / 1000) * 1000; // 999 -> 0, 1001 -> 1
+               for (let i = 1; i <= totMiles / 1000; i++) {
+                  if (i <= 15) {
+                     finalValue = finalValue - finalValue * 0.002;
+                  } else {
+                     break;
                   }
-               }*/
+               }
             }
             console.log("After Mileage = ", finalValue);
 
-            // Check the age
+            // Check the Age
             // Given the number of months, reduce its value .5%
             // After 10 years, the value isn't reduced any further
+            let carYears = (age / 12).toFixed(0); // convert months to years
+            let agePercent;
+            if (carYears <= 10) {
+               agePercent = 0.005 * age;
+               finalValue = finalValue - finalValue * agePercent;
+            } else {
+               finalValue = finalValue - finalValue * 120;
+            }
+
             console.log("After Age = ", finalValue);
 
-            // Check the number of owners
+            // Check the number of Owners
             // If less than 2 add 10% to the final value after all calculations
             if (owners <= 2) {
                finalValue = finalValue + finalValue * 0.1;
                console.log("After 1 or No Owners = ", finalValue);
             }
 
+            console.log(
+               `${make} ${model}, Final Value = $${finalValue.toFixed(2)}`
+            );
+
+            // Return the new value as a result of the calculations
             res.status(200).json({
-               msg: `New Value For Your: ${make} ${model}`,
+               msg: `SUCCESS: New Value For Your: ${make} ${model}`,
                value: parseFloat(finalValue.toFixed(2)),
             });
          }
