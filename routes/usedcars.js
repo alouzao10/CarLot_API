@@ -1,10 +1,15 @@
+// Set up the express environment
 const express = require("express");
+// Create an instance of the router to communicate with the app
 const router = express.Router();
 
+// Load in the fetch function to access the API data fetch
 const fetch = require("node-fetch");
 
+// Load in the data of used cars to use
 const usedCars = require("../data/UsedCars.js");
 
+// Set the url and option needed to use the external API
 const API_URL = "https://vpic.nhtsa.dot.gov/api//vehicles/GetModelsForMake";
 const API_FORMAT = "format=json";
 
@@ -12,63 +17,100 @@ router.get("/", (req, res) => {
    res.status(200).json(usedCars);
 });
 
-router.get("/value/:id", async (req, res) => {
-   // Calculate the Value of the car based on its attributes
-   // 1) Return the car from the list based on the provided id
-   // 2) Verify that the make and model are known checking against the provided API
-   // https://vpic.nhtsa.dot.gov/api/getmodelsformake/{make}
-   // 3) Check the value of the owners to determine any effect on the value
-   // 4) Make calculations based on the factors for the other attributes
-   // 5) Send back the value of the used car
-
-   let finalValue = 0;
-
+// Get the used car based on the provided id
+router.get("/car/:id", (req, res) => {
    let carID = parseInt(req.params.id);
-   let car = usedCars.filter((car) => car.id === carID);
-   if (car.length === 0) {
-      res.status(400).json({
-         msg: "ERROR: Your car was not found on the lot.",
+   let carFound = usedCars.some((car) => car.id === carID);
+   if (!carFound) {
+      res.status(404).json({
+         msg: "ERROR: Your used car was not found on the lot.",
       });
    } else {
-      const { make, model, age, mileage, owners, collisions, value } = car[0];
-      console.log(`${make} ${model}, Initial Value = $${value.toFixed(2)}`);
+      let usedCar = usedCars.filter((car) => car.id === carID);
+      res.status(200).json({ msg: "Here's your USED car:", usedCar });
+   }
+});
+
+// Calculate the Value of the car based on its attributes
+// 1) Return the car from the list based on the provided id
+// 2) Verify that the make and model are known checking against the provided API
+//    https://vpic.nhtsa.dot.gov/api/getmodelsformake/{make}
+// 3) Check the value of the owners to determine any effect on the value
+// 4) Make calculations based on the factors for the other attributes
+// 5) Send back the value of the used car
+router.get("/value/:id", async (req, res) => {
+   let finalValue = 0;
+
+   // Capture the route parameter for the car id
+   let carID = parseInt(req.params.id);
+   // See if a car with a matching record with the same id
+   let carFound = usedCars.some((car) => car.id === carID);
+   if (!carFound) {
+      // If a car record isn't found return an error
+      res.status(404).json({
+         msg: "ERROR: Your used car was not found on the lot.",
+      });
+   } else {
+      // If a car record is found pull the attributes of its record
+      let car = usedCars.filter((car) => car.id === carID);
+      // Break out each attribute and assign it to its own variable for use
+      const {
+         make,
+         model,
+         age = parseInt(age),
+         mileage,
+         owners = parseInt(owners),
+         collisions,
+         value = parseFloat(value),
+      } = car[0];
+      console.log(`${make} ${model}, Initial Value = $${value}`);
+      // Call the API to check if the car's Make exists
       let foundMake = await fetch(`${API_URL}/${make}?${API_FORMAT}`)
          .then((ret) => ret.json())
          .then((data) => {
             return data;
          });
       if (foundMake.Count === 0) {
-         // Car Make is not found, respond with error
-         res.status(400).json({
+         // If the car's Make is not found return an error
+         res.status(404).json({
             msg: `ERROR: Car id:${carID} make:${make} was not found.`,
          });
       } else {
-         // Car Make is found, check if Model is found
+         // If the car's Make is found check if the Model is found
          let foundModel = foundMake.Results.some(
             (car) => car.Model_Name.toLowerCase() === model.toLowerCase()
          );
          if (!foundModel) {
-            // Car Model is not found respond with error
-            res.status(400).json({
-               msg: `ERROR: Car id:${carID} model:${model} was not found.`,
+            // If the car's Model is not found return an error
+            res.status(404).json({
+               msg: `ERROR: Car id:${carID} make:${make} model:${model} was not found.`,
             });
          } else {
-            // Car Model is found and can continue with calculations
+            // If the car's Model is found proceed with value calculation
 
             // Check the number of Owners
-            // If more than 2 owners, reduce initial value by 25%
+            // If more than 2 owners, reduce initial value by 25% (0.25)
             if (owners > 2) {
-               // Update initial value;
+               // Start by updating the initial value;
                finalValue = value - value * 0.25;
-               console.log("After 2+ Owners = ", finalValue);
+               //console.log("After 2+ Owners = ", finalValue);
             } else {
                // Set to the initial value
                finalValue = value;
             }
 
             // Check the Collisions
-            // For every collision remove 2% of its value up to 5 collisions
+            // For every collision remove 2% (0.02) of its value up to 5 collisions
             // If 0, doesn't effect final value
+            /*
+               let collPercent;
+               if (collisions <= 5) {
+                  collPercent = 0.02 * collisions;
+               } else {
+                  collPercent = 0.1; // 0.02 * 5
+               }
+               finalValue = finalValue - finalValue * collPercent;
+            */
             if (collisions > 0) {
                for (let i = 1; i <= collisions; i++) {
                   if (i <= 5) {
@@ -78,12 +120,24 @@ router.get("/value/:id", async (req, res) => {
                   }
                }
             }
-            console.log("After Collisions = ", finalValue);
+            //console.log("After Collisions = ", finalValue);
 
             // Check the Mileage
-            // Reduce the value by .002% for every 1,000 miles
+            // Reduce the value by .2% (0.002) for every 1,000 miles
             // After the mileage reaches 150,000 miles its value can't be reduced
             // If 0, doesn't effect final value
+            /*
+               let milePercent;
+               if (totMiles === 1000) {
+                  milePercent = 0.002;
+               } else if (totMiles <= 150000) {
+                  milePercent = 0.002 * (totMiles / 1000);
+               } else {
+                  milePercent = 0.3; // 0.002 * (150000 / 1000)
+               }
+               finalValue = finalValue - finalValue * milePercent;
+
+            */
             if (mileage > 0) {
                let totMiles = Math.floor(mileage / 1000) * 1000; // 999 -> 0, 1001 -> 1
                for (let i = 1; i <= totMiles / 1000; i++) {
@@ -94,27 +148,33 @@ router.get("/value/:id", async (req, res) => {
                   }
                }
             }
-            console.log("After Mileage = ", finalValue);
+            //console.log("After Mileage = ", finalValue);
 
             // Check the Age
-            // Given the number of months, reduce its value .5%
+            // Given the number of months, reduce its value .5% (0.005) for each month
             // After 10 years, the value isn't reduced any further
-            let carYears = (age / 12).toFixed(0); // convert months to years
-            let agePercent;
-            if (carYears <= 10) {
-               agePercent = 0.005 * age;
-               finalValue = finalValue - finalValue * agePercent;
-            } else {
-               finalValue = finalValue - finalValue * 120;
+            let carYears = Math.floor(age / 12); // convert months to years
+            for (let i = 1; i <= age; i++) {
+               if (i <= 120) {
+                  finalValue = finalValue - finalValue * 0.005;
+               } else {
+                  break;
+               }
             }
+            /*let agePercent;
+            if (carYears <= 10) {
+               finalValue = finalValue - finalValue * 0.005 * age;
+            } else {
+               finalValue = finalValue - finalValue * 0.005 * 120;
+            }*/
 
-            console.log("After Age = ", finalValue);
+            //console.log("After Age = ", finalValue);
 
             // Check the number of Owners
-            // If less than 2 add 10% to the final value after all calculations
+            // If less than 2 add 10% (0.10) to the final value after all calculations
             if (owners <= 2) {
                finalValue = finalValue + finalValue * 0.1;
-               console.log("After 1 or No Owners = ", finalValue);
+               //console.log("After 1 or No Owners = ", finalValue);
             }
 
             console.log(
@@ -127,6 +187,137 @@ router.get("/value/:id", async (req, res) => {
                value: parseFloat(finalValue.toFixed(2)),
             });
          }
+      }
+   }
+});
+
+// An alternative path to calculate the same value
+// Calculate the Value of the car based on its attributes
+// 1) Return the car from the list based on the provided id
+// 2) Verify that the make and model are known checking against the provided API
+//    https://vpic.nhtsa.dot.gov/api/getmodelsformake/{make}
+// 3) Check the value of the owners to determine any effect on the value
+// 4) Make calculations based on the factors for the other attributes
+// 5) Send back the value of the used car
+router.get("/value/:value/:make/:model/:age/:owners", async (req, res) => {
+   // http://localhost:3000/used/value/34560/Honda/Civic/62/2?mileage=55890&collisions=1
+
+   let finalValue = 0.0;
+
+   // Capture the mandatory route parameter for the car
+   const {
+      value = parseFloat(value),
+      make,
+      model,
+      age = parseInt(age),
+      owners = parseInt(owners),
+   } = req.params;
+   if (!value || !make || !model || !age || !owners) {
+      res.status(404).json({
+         msg: `ERROR: Please provide the correct route parameters for the used car.`,
+      });
+   }
+
+   // Capture the optional route parameters for the car
+   let queryString = req.query;
+   const mileage = queryString.mileage ? queryString.mileage : 0;
+   const collisions = queryString.collisions ? queryString.collisions : 0;
+
+   console.log(`${make} ${model}, Initial Value = $${value}`);
+   // Call the API to check if the car's Make exists
+   let foundMake = await fetch(`${API_URL}/${make}?${API_FORMAT}`)
+      .then((ret) => ret.json())
+      .then((data) => {
+         return data;
+      });
+   if (foundMake.Count === 0) {
+      // If the car's Make is not found return an error
+      res.status(404).json({
+         msg: `ERROR: Car make:${make} was not found.`,
+      });
+   } else {
+      // If the car's Make is found check if the Model is found
+      let foundModel = foundMake.Results.some(
+         (car) => car.Model_Name.toLowerCase() === model.toLowerCase()
+      );
+      if (!foundModel) {
+         // If the car's Model is not found return an error
+         res.status(404).json({
+            msg: `ERROR: Car make:${make} model:${model} was not found.`,
+         });
+      } else {
+         // If the car's Model is found proceed with value calculation
+
+         // Check the number of Owners
+         // If more than 2 owners, reduce initial value by 25% (0.25)
+         if (owners > 2) {
+            // Start by updating the initial value;
+            finalValue = value - value * 0.25;
+            //console.log("After 2+ Owners = ", finalValue);
+         } else {
+            // Set to the initial value
+            finalValue = value;
+         }
+
+         // Check the Collisions
+         // For every collision remove 2% (0.02) of its value up to 5 collisions
+         // If 0, doesn't effect final value
+         if (collisions > 0) {
+            for (let i = 1; i <= collisions; i++) {
+               if (i <= 5) {
+                  finalValue = finalValue - finalValue * 0.02;
+               } else {
+                  break;
+               }
+            }
+         }
+         //console.log("After Collisions = ", finalValue);
+
+         // Check the Mileage
+         // Reduce the value by .2% (0.002) for every 1,000 miles
+         // After the mileage reaches 150,000 miles its value can't be reduced
+         // If 0, doesn't effect final value
+         if (mileage > 0) {
+            let totMiles = Math.floor(mileage / 1000) * 1000; // 999 -> 0, 1001 -> 1
+            for (let i = 1; i <= totMiles / 1000; i++) {
+               if (i <= 15) {
+                  finalValue = finalValue - finalValue * 0.002;
+               } else {
+                  break;
+               }
+            }
+         }
+         //console.log("After Mileage = ", finalValue);
+
+         // Check the Age
+         // Given the number of months, reduce its value .5% (0.005) for each month
+         // After 10 years, the value isn't reduced any further
+         let carYears = Math.floor(age / 12); // convert months to years
+         for (let i = 1; i <= age; i++) {
+            if (i <= 120) {
+               finalValue = finalValue - finalValue * 0.005;
+            } else {
+               break;
+            }
+         }
+         //console.log("After Age = ", finalValue);
+
+         // Check the number of Owners
+         // If less than 2 add 10% (0.10) to the final value after all calculations
+         if (owners <= 2) {
+            finalValue = finalValue + finalValue * 0.1;
+            //console.log("After 1 or No Owners = ", finalValue);
+         }
+
+         console.log(
+            `${make} ${model}, Final Value = $${finalValue.toFixed(2)}`
+         );
+
+         // Return the new value as a result of the calculations
+         res.status(200).json({
+            msg: `SUCCESS: New Value For Your: ${make} ${model}`,
+            value: parseFloat(finalValue.toFixed(2)),
+         });
       }
    }
 });
