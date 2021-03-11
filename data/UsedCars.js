@@ -1,4 +1,4 @@
-const UsedCars = [
+var UsedCars = [
    {
       id: 1,
       make: "Honda",
@@ -16,7 +16,7 @@ const UsedCars = [
       age: 24,
       mileage: 34567,
       owners: 1,
-      collisions: 0,
+      collisions: 4,
       value: 25779,
    },
    {
@@ -41,4 +41,5 @@ const UsedCars = [
    },
 ];
 
+// Export the data for use in the app
 module.exports = UsedCars;

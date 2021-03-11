@@ -1,8 +1,8 @@
-const NewCars = [
+var NewCars = [
    {
       id: 1,
       make: "Honda",
-      model: "Metro",
+      model: "Civic",
       age: 0,
       mileage: 0,
       owners: 0,
@@ -12,7 +12,7 @@ const NewCars = [
    {
       id: 2,
       make: "Toyota",
-      model: "Prius Plus",
+      model: "Prius",
       age: 0,
       mileage: 0,
       owners: 0,
@@ -22,7 +22,7 @@ const NewCars = [
    {
       id: 3,
       make: "Ford",
-      model: "Stallion",
+      model: "Mustang",
       age: 0,
       mileage: 0,
       owners: 0,
@@ -32,7 +32,7 @@ const NewCars = [
    {
       id: 4,
       make: "Tesla",
-      model: "Roadster",
+      model: "Model 3",
       age: 0,
       mileage: 0,
       owners: 0,
@@ -41,4 +41,5 @@ const NewCars = [
    },
 ];
 
+// Export the data for use in the app
 module.exports = NewCars;
