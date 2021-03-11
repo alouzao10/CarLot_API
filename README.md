@@ -6,14 +6,16 @@
 
 -Use the following paths/routes to access the information provided by the API.
 
-=========================================
+====== Home ======
 -"/" = Home Route
-=========================================
+
+====== New Cars ======
 -"/new" = New Cars Route
 -"/new/" = Returns the available new cars from the NewCars data source.
 -"/new/car/:id" = Returns a new car based on its id, if one exists, from the NewCars data source.
 -"/new/car/buy/:make/:model" = Removes the bought new car from the lot, returns the bought car, and removes it from the NewCars data source.
-=========================================
+
+====== Used Cars ======
 -"/used" = Used Cars Route
 -"/used/" = Returns the available used cars from the UsedCars data source.
 -"/used/car/:id" = Returns a used car based on its id, if one exists, from the UsedCars data source.
