@@ -57,15 +57,7 @@ router.get("/value/:id", async (req, res) => {
       // If a car record is found pull the attributes of its record
       let car = usedCars.filter((car) => car.id === carID);
       // Break out each attribute and assign it to its own variable for use
-      const {
-         make,
-         model,
-         age = parseInt(age),
-         mileage,
-         owners = parseInt(owners),
-         collisions,
-         value = parseFloat(value),
-      } = car[0];
+      const { make, model, age, mileage, owners, collisions, value } = car[0];
       console.log(`${make} ${model}, Initial Value = $${value}`);
       // Call the API to check if the car's Make exists
       let foundMake = await fetch(`${API_URL}/${make}?${API_FORMAT}`)
@@ -115,18 +107,19 @@ router.get("/value/:value/:make/:model/:age/:owners", async (req, res) => {
    // http://localhost:3000/used/value/34560/Honda/Civic/62/2?mileage=55890&collisions=1
 
    // Capture the mandatory route parameter for the car
-   const {
-      value = parseFloat(value),
-      make,
-      model,
-      age = parseInt(age),
-      owners = parseInt(owners),
-   } = req.params;
+   let params = req.params;
+   const value = parseFloat(params.value);
+   const make = params.make;
+   const model = params.model;
+   const age = parseInt(params.age);
+   const owners = parseInt(params.owners);
 
    // Capture the optional route parameters for the car from the query string
    let queryString = req.query;
-   const mileage = queryString.mileage ? queryString.mileage : 0;
-   const collisions = queryString.collisions ? queryString.collisions : 0;
+   const mileage = queryString.mileage ? parseInt(queryString.mileage) : 0;
+   const collisions = queryString.collisions
+      ? parseInt(queryString.collisions)
+      : 0;
 
    console.log(`${make} ${model}, Initial Value = $${value}`);
    // Call the API to check if the car's Make exists
