@@ -16,7 +16,7 @@ const API_FORMAT = "format=json";
 // Home path for the used cars route
 router.get("/", (req, res) => {
    // http://localhost:3000/used/
-   http: res.status(200).json(usedCars);
+   res.status(200).json(usedCars);
 });
 
 // Get the used car based on the provided id
